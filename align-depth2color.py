@@ -8,6 +8,8 @@
 # Imports
 from __future__ import print_function
 import argparse
+from copy import deepcopy
+from turtle import color
 # First import the library
 import pyrealsense2 as rs
 # Import Numpy for easy array manipulation
@@ -45,10 +47,13 @@ else:
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
 # Start streaming
-profile = pipeline.start(config)
+cfg = pipeline.start(config) # cfg is a better name for this!
+profile = cfg.get_stream(rs.stream.color)
+intr = profile.as_video_stream_profile().get_intrinsics()
+
 
 # Getting the depth sensor's depth scale (see rs-align example for explanation)
-depth_sensor = profile.get_device().first_depth_sensor()
+depth_sensor = cfg.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
 print("Depth Scale is: " , depth_scale)
 
@@ -133,7 +138,7 @@ def on_high_V_thresh_trackbar(val):
 # args = parser.parse_args()
 
 ## [window]
-cv.namedWindow(window_capture_name)
+# cv.namedWindow(window_capture_name)
 cv.namedWindow(window_detection_name)
 ## [window]
 
@@ -167,6 +172,7 @@ try:
 
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
+        c_img_for_conts = color_image # Copy of Color Image
 
         # Remove background - Set pixels further than clipping_distance to grey
         grey_color = 153
@@ -183,9 +189,55 @@ try:
         frame_HSV = cv.cvtColor(bg_removed, cv.COLOR_BGR2HSV)
         frame_threshold = cv.inRange(frame_HSV, (low_H, low_S, low_V), (high_H, high_S, high_V))
 
-        cv.imshow(window_capture_name, frame_HSV)
+        # cv.imshow(window_capture_name, bg_removed)
+        images = np.hstack((color_image, depth_colormap))
         cv.imshow(window_detection_name, frame_threshold)
 
+        # Contouring    
+        contours, hierarchy = cv.findContours(frame_threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+        centroids = []
+        areas = []
+        for cont in contours:
+            currMoment = cv.moments(cont) # Get the Current Moment for the current cont
+            conts_area = cv.contourArea(cont)
+            try: 
+                cx = int(currMoment['m10']/currMoment['m00'])
+                cy = int(currMoment['m01']/currMoment['m00'])
+                new_centroid = [cx, cy]
+                centroids.append(new_centroid)
+                areas.append(conts_area)
+            except:
+                pass
+        try:
+            # Find Largest Contour 
+            MaxContTest = np.argmax(areas) # Want to get centroid of Max Contour
+            MaxCentroid = centroids[MaxContTest]
+            c_img_for_conts = cv.drawContours(c_img_for_conts, contours, -1, (0,255,0))
+            c_img_for_conts = cv.circle(c_img_for_conts, MaxCentroid, 10, (50, 60, 50), 10) # Fix this part
+        except: 
+            print("404 Contour Not Found")
+
+        # Depth Information Retrieval
+        dpt_frame = aligned_depth_frame.as_depth_frame()
+        pixel_distance_in_meters = dpt_frame.get_distance(MaxCentroid[0],MaxCentroid[1])
+        print(f"Distance (m): {pixel_distance_in_meters}\n")
+        
+        real_coords = rs.rs2_deproject_pixel_to_point(intr, [MaxCentroid[0],MaxCentroid[1]], pixel_distance_in_meters)
+        print(f"Real Coords are: {real_coords}")
+        #  TODO: Image Filtering 
+        
+
+        # print(contours)
+        # Might need to change index ->
+        # MaxCont = max(contours, key = cv.contourArea)
+        # MaxContTest = np.argmax(contours)
+        # print(MaxContTest)
+
+        
+        cv.imshow("Contours", c_img_for_conts)
+    
+        
         # Bitwise-AND mask and original image
         # res = cv.bitwise_and(bg_removed, bg_removed, mask=mask)
 
