@@ -70,71 +70,9 @@ align = rs.align(align_to)
 
 # Trackbar Code
 
-# max_value = 255
-# max_value_H = 360//2
-# low_H = 0
-# low_S = 0
-# low_V = 0
-# high_H = max_value_H
-# high_S = max_value
-# high_V = max_value
-# window_capture_name = 'Video Capture'
-# window_detection_name = 'Object Detection'
-# low_H_name = 'Low H'
-# low_S_name = 'Low S'
-# low_V_name = 'Low V'
-# high_H_name = 'High H'
-# high_S_name = 'High S'
-# high_V_name = 'High V'
-
-# ## [low]
-# def on_low_H_thresh_trackbar(val):
-#     global low_H
-#     global high_H
-#     low_H = val
-#     low_H = min(high_H-1, low_H)
-#     cv.setTrackbarPos(low_H_name, window_detection_name, low_H)
-# ## [low]
-
-# ## [high]
-# def on_high_H_thresh_trackbar(val):
-#     global low_H
-#     global high_H
-#     high_H = val
-#     high_H = max(high_H, low_H+1)
-#     cv.setTrackbarPos(high_H_name, window_detection_name, high_H)
-# ## [high]
-
-# def on_low_S_thresh_trackbar(val):
-#     global low_S
-#     global high_S
-#     low_S = val
-#     low_S = min(high_S-1, low_S)
-#     cv.setTrackbarPos(low_S_name, window_detection_name, low_S)
-
-# def on_high_S_thresh_trackbar(val):
-#     global low_S
-#     global high_S
-#     high_S = val
-#     high_S = max(high_S, low_S+1)
-#     cv.setTrackbarPos(high_S_name, window_detection_name, high_S)
-
-# def on_low_V_thresh_trackbar(val):
-#     global low_V
-#     global high_V
-#     low_V = val
-#     low_V = min(high_V-1, low_V)
-#     cv.setTrackbarPos(low_V_name, window_detection_name, low_V)
-
-# def on_high_V_thresh_trackbar(val):
-#     global low_V
-#     global high_V
-#     high_V = val
-#     high_V = max(high_V, low_V+1)
-#     cv.setTrackbarPos(high_V_name, window_detection_name, high_V)
 # ax_value = 255
 max_value_H = 360//2
-low_H = 0
+low_H = 80
 # low_S = 0
 # low_V = 0
 high_H = max_value_H
@@ -208,8 +146,8 @@ cv.createTrackbar(high_H_name, window_detection_name , high_H, max_value_H, on_h
 
 # ------ Robot Arm ------
 # Initialize the Robot Arm, so we can move it later
-# RoboMoves = arm.RobotMovement()
-# RoboMoves.GoHome()
+RoboMoves = arm.RobotMovement()
+RoboMoves.GoSleep()
 
 # Streaming loop
 try:
@@ -241,8 +179,8 @@ try:
         # Render images:
         #   depth align to color on left
         #   depth on right
-        depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET)
-        images = np.hstack((bg_removed, depth_colormap))
+        # depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET)
+        # images = np.hstack((bg_removed, depth_colormap))
 
         # Fixed Thresholding
         LOW_H = 118
@@ -254,10 +192,10 @@ try:
 
         # Thresholding the Images
         frame_HSV = cv.cvtColor(bg_removed, cv.COLOR_BGR2HSV)
-        frame_threshold = cv.inRange(frame_HSV, (LOW_H, LOW_S, LOW_V), (HIGH_H, HIGH_S, HIGH_V))
+        frame_threshold = cv.inRange(frame_HSV, (low_H, LOW_S, LOW_V), (high_H, HIGH_S, HIGH_V))
 
         # cv.imshow(window_capture_name, bg_removed)
-        images = np.hstack((color_image, depth_colormap))
+        # images = np.hstack((color_image, depth_colormap))
         cv.imshow(window_detection_name, frame_threshold)
 
         # Contouring    
@@ -265,6 +203,7 @@ try:
 
         centroids = []
         areas = []
+        MaxCentroid = [0,0]
         for cont in contours:
             currMoment = cv.moments(cont) # Get the Current Moment for the current cont
             conts_area = cv.contourArea(cont)
@@ -280,41 +219,37 @@ try:
             # Find Largest Contour 
             MaxContTest = np.argmax(areas) # Want to get centroid of Max Contour
             MaxCentroid = centroids[MaxContTest]
-            c_img_for_conts = cv.drawContours(c_img_for_conts, contours, -1, (0,255,0))
-            c_img_for_conts = cv.circle(c_img_for_conts, MaxCentroid, 10, (50, 60, 50), 10) # Fix this part
+            c_img_for_conts = cv.drawContours(c_img_for_conts, contours, -1, (255,204,0)) # if BGR (204,0,255)
+            c_img_for_conts = cv.circle(c_img_for_conts, MaxCentroid, 10, (24,146,221), -1) # Thickness of -1 Fills in Circle 
         except: 
             print("404 Contour Not Found")
 
         # Depth Information Retrieval
         dpt_frame = aligned_depth_frame.as_depth_frame()
-        pixel_distance_in_meters = dpt_frame.get_distance(MaxCentroid[0],MaxCentroid[1])
-        # print(f"Distance (m): {pixel_distance_in_meters}\n")
+        pixel_distance_in_meters = dpt_frame.get_distance(MaxCentroid[0],MaxCentroid[1]) # Gives in Meters
+        print(f"Distance (m): {pixel_distance_in_meters}\n")
         
         real_coords = rs.rs2_deproject_pixel_to_point(intr, [MaxCentroid[0],MaxCentroid[1]], pixel_distance_in_meters)
         print(f"Real Coords are: {real_coords[0], real_coords[1], real_coords[2]}")
+        
         #  TODO: Image Filtering
 
+        # Cartesian to Cylindrical
         radius_camera = np.sqrt(real_coords[0]**2 + real_coords[2]**2)
-    
-        # print(contours)
-        # Might need to change index ->
-        # MaxCont = max(contours, key = cv.contourArea)
-        # MaxContTest = np.argmax(contours)
-        # print(MaxContTest)
 
         cv.imshow("Contours", c_img_for_conts)
     
         # Phi Calculations
-        depth_cam_to_arm = 0.305
+        depth_cam_to_arm = 0.344 # 0.35200000762939453 # 0.34200000762939453
         d_pen = pixel_distance_in_meters
         depth_pen_to_arm = d_pen - depth_cam_to_arm
-        x_base_2_pen_robot_frame = 0.25
+        x_base_2_pen_robot_frame = 0.09066241 + 0.07264231145381927
 
         # real_x_to_pen = real_coords[0]
         phi = np.arctan(depth_pen_to_arm/x_base_2_pen_robot_frame)
-        # print(f"Phi is {phi}")
+        print(f"Phi is {phi}")
         
-        # RoboMoves.move(phi)
+        RoboMoves.move(phi)
         # RoboMoves.ExtendArm(radius_camera=radius_camera)
 
         # bg_removed is our color_image with the background converted to gray.
