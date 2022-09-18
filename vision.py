@@ -8,7 +8,6 @@
 # Imports
 from __future__ import print_function
 import argparse
-from copy import deepcopy
 from turtle import color
 # First import the library
 import pyrealsense2 as rs
@@ -17,6 +16,8 @@ import numpy as np
 # Import OpenCV for easy image rendering
 import cv2 as cv
 import arm
+import time
+
 
 # Create a pipeline
 pipeline = rs.pipeline()
@@ -72,7 +73,7 @@ align = rs.align(align_to)
 
 # ax_value = 255
 max_value_H = 360//2
-low_H = 80
+low_H = 100
 # low_S = 0
 # low_V = 0
 high_H = max_value_H
@@ -190,20 +191,18 @@ try:
         LOW_V = 45
         HIGH_V = 255
 
-        # Thresholding the Images
+        # ----- Thresholding and Contouring -----
         frame_HSV = cv.cvtColor(bg_removed, cv.COLOR_BGR2HSV)
         frame_threshold = cv.inRange(frame_HSV, (low_H, LOW_S, LOW_V), (high_H, HIGH_S, HIGH_V))
-
         # cv.imshow(window_capture_name, bg_removed)
         # images = np.hstack((color_image, depth_colormap))
         cv.imshow(window_detection_name, frame_threshold)
-
-        # Contouring    
         contours, hierarchy = cv.findContours(frame_threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
+        # ----- Centroid Location Finding -----
         centroids = []
         areas = []
-        MaxCentroid = [0,0]
+        MaxCentroid = [0,0] # For defaults. Avoids issue of code not compiling because MaxCentroid is not defined
         for cont in contours:
             currMoment = cv.moments(cont) # Get the Current Moment for the current cont
             conts_area = cv.contourArea(cont)
@@ -222,45 +221,72 @@ try:
             c_img_for_conts = cv.drawContours(c_img_for_conts, contours, -1, (255,204,0)) # if BGR (204,0,255)
             c_img_for_conts = cv.circle(c_img_for_conts, MaxCentroid, 10, (24,146,221), -1) # Thickness of -1 Fills in Circle 
         except: 
+            # In the event no contour is foundself.robot
             print("404 Contour Not Found")
 
-        # Depth Information Retrieval
+        # ----- Depth Information Retrieval -----
         dpt_frame = aligned_depth_frame.as_depth_frame()
         pixel_distance_in_meters = dpt_frame.get_distance(MaxCentroid[0],MaxCentroid[1]) # Gives in Meters
-        print(f"Distance (m): {pixel_distance_in_meters}\n")
+        # print(f"Distance (m): {pixel_distance_in_meters}\n")
         
         real_coords = rs.rs2_deproject_pixel_to_point(intr, [MaxCentroid[0],MaxCentroid[1]], pixel_distance_in_meters)
         print(f"Real Coords are: {real_coords[0], real_coords[1], real_coords[2]}")
         
         #  TODO: Image Filtering
 
-        # Cartesian to Cylindrical
-        radius_camera = np.sqrt(real_coords[0]**2 + real_coords[2]**2)
 
-        cv.imshow("Contours", c_img_for_conts)
-    
-        # Phi Calculations
+        # Cartesian to Cylindrical
+        radius_camera = np.sqrt(real_coords[0]**2 + real_coords[2]**2) # Correctly Calculated
+        
+      
+        # ----- Phi Calculations -----
         depth_cam_to_arm = 0.344 # 0.35200000762939453 # 0.34200000762939453
         d_pen = pixel_distance_in_meters
         depth_pen_to_arm = d_pen - depth_cam_to_arm
         x_base_2_pen_robot_frame = 0.09066241 + 0.07264231145381927
+        theta = np.arctan(depth_pen_to_arm/x_base_2_pen_robot_frame)
 
-        # real_x_to_pen = real_coords[0]
-        phi = np.arctan(depth_pen_to_arm/x_base_2_pen_robot_frame)
-        print(f"Phi is {phi}")
+        p = RoboMoves.GetEEInfo()
+        grasp_flag = False
+        Calc_theta = np.arctan(p[1]/p[0]) # Theta calculated from End Effector
+        # print(f"theta is {theta}")    
+        # print(f"Calc_theta {Calc_theta}, Real Theta {theta}")
+        # print("theta diff:", np.abs(np.abs(Calc_theta) - np.abs(theta)))
+
+        # angle_tol = 0.019
+        # if np.abs(np.abs(Calc_theta)- np.abs(theta)) > angle_tol or Calc_theta == 0:
+        #     print("Moving Waist")
+        #     RoboMoves.move(theta)
+
+        # arm_tol = 0.015
+        # robot_radius = np.sqrt((p[0]**2) + (p[1]**2))
+        # if np.abs(radius_camera - robot_radius) > 0.015:
+        #     print("Moving Arm")
+        #     RoboMoves.ExtendArm(radius_camera=radius_camera)
+
+        # grip_tol = 0.015
+        # if np.abs((radius_camera - robot_radius)) <= 0.015:
+        #     print("Ready to Grasp!")
+        #     print(np.abs(radius_camera - robot_radius))
+        #     grasp_flag = RoboMoves.Grasp()
+        #     time.sleep(3)
         
-        RoboMoves.move(phi)
-        # RoboMoves.ExtendArm(radius_camera=radius_camera)
+        # if grasp_flag:
+        #     RoboMoves.GoSleep()
+        #     RoboMoves.Release()
+        #     # cv.destroyAllWindows()
+        #     break
+
+        # Tolerance -> Defined as error between desired angle, and robot's current angle
 
         # bg_removed is our color_image with the background converted to gray.
         # Binary, Binary Inverted, Threshold Truncated, Threshold to Zero, Threshold to Zero Inverted
         # _, dst = cv.threshold(bg_removed, threshold_value, max_binary_value, threshold_type)
 
+        # ----- Displaying -----
         # cv.namedWindow('Align Example', cv.WINDOW_NORMAL)
         # cv.imshow('Align Example', images)
-        # cv.imshow('OG', bg_removed)
-        # cv.imshow('Mask', mask)
-        # cv.imshow('Res', res)
+        cv.imshow("Contours", c_img_for_conts)
         key = cv.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:

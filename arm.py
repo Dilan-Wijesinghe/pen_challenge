@@ -59,6 +59,7 @@ class RobotMovement:
 
     def Grasp(self):
         self.robot.gripper.grasp()
+        return True
     
     def SingleJointMove(self):
         mode = 'h'
@@ -78,37 +79,43 @@ class RobotMovement:
     
     def ExtendArm(self, radius_camera):
         p = self.GetEEInfo()
-        robot_radius = np.sqrt((p[0]**2)+ (p[1]**2))
-        print(f"robo_rad {robot_radius}\n", f"cam_rad is {radius_camera}")
+        robot_radius = np.sqrt((p[0]**2) + (p[1]**2))
+        print(f"robo_rad {robot_radius} ", f"cam_rad is {radius_camera}")
         displacement = radius_camera - robot_radius
         # displacement = robot_radius - radius_camera
         print(displacement)
         self.robot.arm.set_ee_cartesian_trajectory(x=displacement)
-    
+
+    def RaiseArm(self, cam_z):
+        p = self.GetEEInfo()
+        robot_z = p[2] # Gets Z value of Robot
+        print(f"Robo_Z {robot_z} ", f"cam_rad is {cam_z}")
+        disp = cam_z - robot_z
+        print(disp)
+        self.robot.arm.set_ee_cartesian_trajectory(z=disp)
+
     def TestArmExtend(self, disp):
         self.robot.arm.set_ee_cartesian_trajectory(x=disp)
 
 
+RoboMoveStart = RobotMovement()
+RoboMoveStart.GoSleep()
 
-
-# RoboMoveStart = RobotMovement()
-# RoboMoveStart.GoSleep()
-
-# mode = 'h'
-# while mode != 'q':
-#     mode=input("[h]ome, [s]leep, [r]elease, [g]rasp, [j]oint,, [i]nfo, [q]uit\n")
-#     if mode == "h":
-#         RoboMoveStart.GoHome()
-#     elif mode == "s":
-#         RoboMoveStart.GoSleep()
-#     elif mode == 'r':
-#         RoboMoveStart.Release()
-#     elif mode == 'g':
-#         RoboMoveStart.Grasp()
-#     elif mode == 'j':
-#         RoboMoveStart.SingleJointMove()
-#     elif mode == 'i':
-#         RoboMoveStart.GetEEInfo()
-#     elif mode == 'm':
-#         d = input("Please give a displacement")
-#         RoboMoveStart.TestArmExtend(float(d))
+mode = 'h'
+while mode != 'q':
+    mode=input("[h]ome, [s]leep, [r]elease, [g]rasp, [j]oint,, [i]nfo, [q]uit\n")
+    if mode == "h":
+        RoboMoveStart.GoHome()
+    elif mode == "s":
+        RoboMoveStart.GoSleep()
+    elif mode == 'r':
+        RoboMoveStart.Release()
+    elif mode == 'g':
+        RoboMoveStart.Grasp()
+    elif mode == 'j':
+        RoboMoveStart.SingleJointMove()
+    elif mode == 'i':
+        RoboMoveStart.GetEEInfo()
+    elif mode == 'm':
+        d = input("Please give a displacement")
+        RoboMoveStart.TestArmExtend(float(d))
