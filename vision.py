@@ -234,7 +234,6 @@ try:
         
         #  TODO: Image Filtering
 
-
         # Cartesian to Cylindrical
         radius_camera = np.sqrt(real_coords[0]**2 + real_coords[2]**2) # Correctly Calculated
         
@@ -243,40 +242,60 @@ try:
         depth_cam_to_arm = 0.344 # 0.35200000762939453 # 0.34200000762939453
         d_pen = pixel_distance_in_meters
         depth_pen_to_arm = d_pen - depth_cam_to_arm
-        x_base_2_pen_robot_frame = 0.09066241 + 0.07264231145381927
+        x_base_2_pen_robot_frame = 0.09066241 + 0.08161421865224838 # 0.07264231145381927
         theta = np.arctan(depth_pen_to_arm/x_base_2_pen_robot_frame)
 
+        # ----- 
         p = RoboMoves.GetEEInfo()
         grasp_flag = False
         Calc_theta = np.arctan(p[1]/p[0]) # Theta calculated from End Effector
+
+        robo_z = 0.08679080151001911
+        cam_z = 0.03668690845370293
+        z_base_2_pen_robot_frame = robo_z + cam_z
+        # z_coordinate_of_cam - z_base_2_pen_robot_frame
+        
+        curr_cam_z = real_coords[1]
+        disp_z = z_base_2_pen_robot_frame + curr_cam_z
+
+        print(f"cam_z: {cam_z} - robo_z: {robo_z}")
+        
         # print(f"theta is {theta}")    
         # print(f"Calc_theta {Calc_theta}, Real Theta {theta}")
         # print("theta diff:", np.abs(np.abs(Calc_theta) - np.abs(theta)))
 
-        # angle_tol = 0.019
-        # if np.abs(np.abs(Calc_theta)- np.abs(theta)) > angle_tol or Calc_theta == 0:
-        #     print("Moving Waist")
-        #     RoboMoves.move(theta)
+        angle_tol = 0.019
+        if np.abs(np.abs(Calc_theta)- np.abs(theta)) > angle_tol or Calc_theta == 0:
+            print("Moving Waist")
+            RoboMoves.move(theta)
 
-        # arm_tol = 0.015
-        # robot_radius = np.sqrt((p[0]**2) + (p[1]**2))
-        # if np.abs(radius_camera - robot_radius) > 0.015:
-        #     print("Moving Arm")
-        #     RoboMoves.ExtendArm(radius_camera=radius_camera)
+        arm_tol = 0.015
+        robot_radius = np.sqrt((p[0]**2) + (p[1]**2))
+        print(f"Camera Radius: {radius_camera} - - Robot_Radius {robot_radius}")
+        if np.abs(radius_camera - robot_radius) > arm_tol:
+            print("Moving Arm")
+            RoboMoves.ExtendArm(radius_camera=radius_camera)
 
-        # grip_tol = 0.015
-        # if np.abs((radius_camera - robot_radius)) <= 0.015:
-        #     print("Ready to Grasp!")
-        #     print(np.abs(radius_camera - robot_radius))
-        #     grasp_flag = RoboMoves.Grasp()
-        #     time.sleep(3)
+        grip_tol = 0.015
+        if np.abs((radius_camera - robot_radius)) <= 0.015:
+            print("Ready to Grasp!")
+            print(np.abs(radius_camera - robot_radius))
+            grasp_flag = RoboMoves.Grasp()
+            time.sleep(2)
+
+        z_tol = 0.15
+        if disp_z > z_tol:
+            print("Moving on Up!")
+            RoboMoves.RaiseArm(disp_z)
         
-        # if grasp_flag:
-        #     RoboMoves.GoSleep()
-        #     RoboMoves.Release()
-        #     # cv.destroyAllWindows()
-        #     break
+        if grasp_flag:
+            RoboMoves.GoSleep()
+            RoboMoves.Release()
+            # cv.destroyAllWindows()
+            print("Sleeping!")
+            time.sleep(3)
 
+            
         # Tolerance -> Defined as error between desired angle, and robot's current angle
 
         # bg_removed is our color_image with the background converted to gray.

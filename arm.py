@@ -86,36 +86,36 @@ class RobotMovement:
         print(displacement)
         self.robot.arm.set_ee_cartesian_trajectory(x=displacement)
 
-    def RaiseArm(self, cam_z):
-        p = self.GetEEInfo()
-        robot_z = p[2] # Gets Z value of Robot
-        print(f"Robo_Z {robot_z} ", f"cam_rad is {cam_z}")
-        disp = cam_z - robot_z
-        print(disp)
+    def RaiseArm(self, disp):
+        # p = self.GetEEInfo()
+        # robot_z = p[2] # Gets Z value of Robot
+        # print(f"Robo_Z {robot_z} ", f"cam_z is {cam_z}")
+        # disp = cam_z - robot_z
+        # print(disp)
         self.robot.arm.set_ee_cartesian_trajectory(z=disp)
 
     def TestArmExtend(self, disp):
         self.robot.arm.set_ee_cartesian_trajectory(x=disp)
 
 
-RoboMoveStart = RobotMovement()
-RoboMoveStart.GoSleep()
+# RoboMoveStart = RobotMovement()
+# RoboMoveStart.GoSleep()
 
-mode = 'h'
-while mode != 'q':
-    mode=input("[h]ome, [s]leep, [r]elease, [g]rasp, [j]oint,, [i]nfo, [q]uit\n")
-    if mode == "h":
-        RoboMoveStart.GoHome()
-    elif mode == "s":
-        RoboMoveStart.GoSleep()
-    elif mode == 'r':
-        RoboMoveStart.Release()
-    elif mode == 'g':
-        RoboMoveStart.Grasp()
-    elif mode == 'j':
-        RoboMoveStart.SingleJointMove()
-    elif mode == 'i':
-        RoboMoveStart.GetEEInfo()
-    elif mode == 'm':
-        d = input("Please give a displacement")
-        RoboMoveStart.TestArmExtend(float(d))
+# mode = 'h'
+# while mode != 'q':
+#     mode=input("[h]ome, [s]leep, [r]elease, [g]rasp, [j]oint,, [i]nfo, [q]uit\n")
+#     if mode == "h":
+#         RoboMoveStart.GoHome()
+#     elif mode == "s":
+#         RoboMoveStart.GoSleep()
+#     elif mode == 'r':
+#         RoboMoveStart.Release()
+#     elif mode == 'g':
+#         RoboMoveStart.Grasp()
+#     elif mode == 'j':
+#         RoboMoveStart.SingleJointMove()
+#     elif mode == 'i':
+#         RoboMoveStart.GetEEInfo()
+#     elif mode == 'm':
+#         d = input("Please give a displacement")
+#         RoboMoveStart.TestArmExtend(float(d))
